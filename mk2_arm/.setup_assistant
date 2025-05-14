@@ -1,0 +1,25 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: simplified_arm_assembly
+    relative_path: urdf/simplified_arm_assembly.urdf
+  srdf:
+    relative_path: config/simplified_arm_assembly.srdf
+  package_settings:
+    author_name: Lorenzo Ciocca
+    author_email: lorenzociocca333@gmail.com
+    generated_timestamp: 1745401337
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+  modified_urdf:
+    xacros:
+      - control_xacro
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
