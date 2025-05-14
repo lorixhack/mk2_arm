@@ -6,6 +6,8 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from moveit_configs_utils import MoveItConfigsBuilder
 from launch_param_builder import ParameterBuilder
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
 
 
 def generate_launch_description():
@@ -124,8 +126,22 @@ def generate_launch_description():
         respawn=False
     )
 
+    can_pub_exe = DeclareLaunchArgument(
+        "can_pub_exe",
+        default_value="joint_publisher_can.py",
+        description="Publisher of CAN frame",
+    )
+
+    can_pub_node = Node(
+        name="joint_publisher_can",
+        package="mk2_arm",
+        executable=LaunchConfiguration("can_pub_exe"),
+        output="both",
+    )
+
     return LaunchDescription(
         [
+            can_pub_exe,
             rviz_node,
             ros2_control_node,
             joint_state_broadcaster_spawner,
@@ -133,6 +149,7 @@ def generate_launch_description():
             servo_node,
             robot_state_publisher,
             static_tf,
+            can_pub_node,
         ]
     )
 
