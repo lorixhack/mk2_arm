@@ -29,6 +29,11 @@ install (PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install (PROGRAMS
+  scripts/can_sender.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 add_executable(servo_keyboard_input
   src/servo_keyboard_input.cpp  # Percorso del file sorgente
 )

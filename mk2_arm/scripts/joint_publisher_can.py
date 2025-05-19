@@ -4,10 +4,9 @@ import traceback
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
+from std_msgs.msg import Float32, Float32MultiArray
 import time
-import can
-import struct
-import math
+
 
 PACKET_ID = {
     "pitch_joint_1": 0x51,
@@ -24,17 +23,6 @@ class JointPublisherCan(Node):
     def __init__(self):
         super().__init__("joint_publisher_can")
         self.get_logger().info("joint_publisher_can node started")
-
-        try:
-            self.canbus = can.interface.Bus(
-                channel='can0',
-                bustype='socketcan'
-            )
-        except OSError as e:
-            self.get_logger().fatal(
-                f"Error while connecting to CAN bus: {str(e)}\n{traceback.format_exc()}"
-            )
-            raise
 
         time.sleep(5)
 
@@ -54,44 +42,45 @@ class JointPublisherCan(Node):
             10,
         )
 
+        self.pubs = {}
+        for id in PACKET_ID:
+            if id != "roll_joint_2":
+                if id == "pitch_joint_1":
+                    self.pubs[id] = self.create_publisher(
+                        Float32MultiArray,
+                        f'{id}',
+                        10,
+                    )
+                else:
+                    self.pubs[id] = self.create_publisher(
+                        Float32,
+                        f'{id}',
+                        10,
+                    )
+
     def send_joint_states(self, msg:JointState):
-        send_diff = False
+        update_diff = True
         for i in range(0, len(msg.name)):
             if (msg.position[i] != self.joint_states[msg.name[i]]):
-                if (msg.name[i] == "pitch_joint_1" or msg.name[i] == "roll_joint_2") and not send_diff:
-                    self.joint_states["pitch_joint_1"] = msg.position[0]
-                    self.joint_states["roll_joint_2"] = msg.position[1]
-                    send_diff = True
+                if (msg.name[i] == "pitch_joint_1" or msg.name[i] == "roll_joint_2"):
+                    if update_diff:
+                        i0 = self.find_index_by_name(msg.name, "pitch_joint_1")
+                        i1 = self.find_index_by_name(msg.name, "roll_joint_2")
+                        self.joint_states["pitch_joint_1"] = msg.position[i0]
+                        self.joint_states["roll_joint_2"] = msg.position[i1]
+                        update_diff = False
 
-                    valueToSend0 = self.scale_angle(msg.position[0])
-                    valueToSend1 = self.scale_angle(msg.position[1])
-
-                    theta, phi = self.scale_diff_angles(valueToSend0, valueToSend1)
-
-                    aid = struct.pack('bbbb', 00, PACKET_ID["pitch_joint_1"], MODULE_ID, 0x00)
-                    data = struct.pack('ii', theta, phi)
+                        self.pubs["pitch_joint_1"].publish(Float32MultiArray(data = [msg.position[i0], msg.position[i1]]))
 
                 else:
                     self.joint_states[msg.name[i]] = msg.position[i]
-                    valueToSend = self.scale_angle(msg.position[i])
 
-                    aid = struct.pack('bbbb', 00, PACKET_ID[msg.name[i]], MODULE_ID, 0x00)
-                    data = struct.pack('i', valueToSend)
-                
-                can_msg = can.Message(
-                    arbitration_id=int.from_bytes(aid, byteorder='big', signed='False'),
-                    data=data,
-                    is_extended_id=True,
-                )
-
-                self.canbus.send(can_msg)
+                    self.pubs[msg.name[i]].publish(Float32(data = msg.position[i]))
     
-    def scale_angle(self, angle: float):
-        return int((angle*(4096/(2.0*math.pi))))
-        
-    def scale_diff_angles(self, theta: float, phi: float):
-        return int(-(theta + phi)/2), int((theta - phi)/2)
-
+    def find_index_by_name(self, joints, joint_name):
+        for i in range(0, len(joints)):
+            if joints[i] == joint_name:
+                return i
 
 def main(args=None):
     rclpy.init(args=args)
